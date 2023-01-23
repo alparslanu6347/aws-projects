@@ -18,9 +18,9 @@ def header():
     names =["Orhun", "Levent", "Mustafa"]
     #numbers = range(1, 11)
     return render_template("body.html", object = names)
-
+    #return render_template("body.html", object = numbers)
 
 # run this app in debug mode on your local.
 if __name__== "__main__":
     #app.run(debug=True)
-    app.run(host='0.0.0.0', port=80)
+    app.run(host='0.0.0.0', port=80)   ### ec2'da çalışacak olduğu için
