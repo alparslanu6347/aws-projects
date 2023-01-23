@@ -11,7 +11,7 @@ aws --version
 - version2 yi yükleyelim:
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
-sudo ./aws/install
+sudo ./aws/installsudo ./aws/install
 /usr/local/bin/aws --version
 
 - aws-cli da kendimizi tanıtalım:
@@ -76,7 +76,7 @@ aws ec2 run-instances \
     --image-id $LATEST_AMI \
     --count 1 \
     --instance-type t2.micro \
-    --key-name xxxxxxx \
+    --key-name first-key \
     --security-groups roman_numbers_sec_grp \
     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=roman_numbers}]' \
     --user-data file:///home/ec2-user/userdata.sh
