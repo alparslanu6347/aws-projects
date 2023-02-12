@@ -1,5 +1,4 @@
 AWSTemplateFormatVersion: 2010-09-09
-
 Description: |
   The application stack is created with new AWS resources.
   Template creates Application Load Balancer with Auto Scaling Group of Amazon Linux 2 EC2 Instances within default VPC.
@@ -14,34 +13,27 @@ Description: |
   Phonebook Application Website URL will be given as output by Cloudformation Service, after the stack created.
   Application code is downloaded from Github repository, then WebServerLT is configured to prepare Python Flask 
   environment on EC2 and to deploy Phonebook Application on Flask Server.
-
 Parameters:
-
-  InstanceType:                   ## parame ==>> üstten 2.'yi seç.
+  InstanceType:    
     Description: Select your instance type.
     Type: String
     Default: t2.micro
-    AllowedValues:                ## default altına Allowed yaz üstten 2.'yi seç
+    AllowedValues:                
       - t2.micro
       - t2.nano
       - t3.micro
       - m1.small
- 
-  VPC:                                      ## parameter-type-vpc-id
+  VPC:                                      
     Description: Select your VPC
-    Type: AWS::EC2::VPC::Id
-  
-  KeyName:                                  ## parameter-type-keypair-keyname
+    Type: AWS::EC2::VPC::Id 
+  KeyName:                                  
     Description: Please choose your key-pair.
     Type: AWS::EC2::KeyPair::KeyName
-
-  Subnets:                                  ## parameter-type-subnet-id-list
+  Subnets:                                  
     Description: Select at least 2 subnets
     Type: List<AWS::EC2::Subnet::Id> 
-
-Mappings:  ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-findinmap.html
-
-  RegionImageMap:     ### ImageId: ami-0aa7d40eeae50c9a9 'i WebServerLT içinde bu şekilde yazarsak mappings'e gerek kalmaz.
+Mappings:  
+  RegionImageMap:     
     us-east-1:
       AMI: ami-0aa7d40eeae50c9a9
     us-east-2:
@@ -52,24 +44,21 @@ Mappings:  ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/in
       AMI: ami-06e85d4c3149db26a
     eu-west-1:
       AMI: ami-0b752bf1df193a6c4
-
 Resources:
-
   WebServerSecGrp:
-    Type: AWS::EC2::SecurityGroup   ## Docs açmıyor, google yaz # Kırmızı ingress tıkla  
-    Properties:                     ## # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group-rule-1.html
-      GroupDescription: Enable HTTP for Flask Web Server and Ssh for entering to EC2
+    Type: AWS::EC2::SecurityGroup    
+    Properties:                     
+      GroupDescription: Enable HTTP for Flask Web Server and SSH connecting to EC2
       SecurityGroupIngress:
          - IpProtocol: tcp
            FromPort: 22
            ToPort: 22
            CidrIp: 0.0.0.0/0
-         - IpProtocol: tcp          ## An inbound rule permits instances to receive traffic from the specified IPv4 or IPv6 CIDR address range,
-           FromPort: 80             ## or from the instances associated with the specified security group.
+         - IpProtocol: tcp          
+           FromPort: 80             
            ToPort: 80
-           SourceSecurityGroupId: !GetAtt ALBSecGrp.GroupId  ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
-      VpcId: !Ref VPC             ## EC2 security group olsaydı  ==>> SourceSecurityGroupName
-
+           SourceSecurityGroupId: !GetAtt ALBSecGrp.GroupId  
+      VpcId: !Ref VPC             
   ALBSecGrp:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -80,63 +69,54 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0
       VpcId: !Ref VPC
-
-  DBSecGrp:   ## rds-dbsecuritygroup
-    Type: AWS::RDS::DBSecurityGroup   ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-security-group.html
+  DBSecGrp:   
+    Type: AWS::RDS::DBSecurityGroup   
     Properties:
-      DBSecurityGroupIngress:   ## Kırmızı ingress tıkla  ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-security-group-rule.html
-        # - CIDRIP : Write your IP ### NORMALDE RDS-DB PRİVATE olmalı, private olmasa dahi SECGRP INBOUND SOURCE kısmına "MY IP" yazarsak yine ilave güvenlik sağlamış oluruz.!! Fakat bu örnekte public ve default VPC. 
+      DBSecurityGroupIngress:   
         - EC2SecurityGroupId: !GetAtt WebServerSecGrp.GroupId
       GroupDescription: Access for Front-End to Application.
-
-  DBServer:     ### rds-dbinstance (üstteki)
-    Type: AWS::RDS::DBInstance ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-rds-dbinstance.html
+  DBServer:     
+    Type: AWS::RDS::DBInstance 
     Properties:
-      AllocatedStorage: 20 ## Required: Conditional  ## MySQL  Constraints to the amount of storage for each storage type 
+      AllocatedStorage: 20  
       AllowMajorVersionUpgrade: false
       AutoMinorVersionUpgrade: true
-      # AvailabilityZone: us-east-1a  ## İstersen yazabilirsin. ##Default olmayan VPC kullansaydın required. Default: A random, system-chosen Availability Zone in the endpoint's AWS Region.
       BackupRetentionPeriod: 7
-      DBInstanceClass: db.t2.micro   ## Not all DB instance classes are available in all AWS Regions, or for all database engines.
+      DBInstanceClass: db.t2.micro   
       DBInstanceIdentifier: arrow
-      DBName: clarusway_phonebook  ## MySQL ==>> The name of the database to create when the DB instance is created. If this parameter is not specified, no database is created in the DB instance.
+      DBName: clarusway_phonebook  
       DBSecurityGroups:
         - !Ref DBSecGrp
       Engine: mysql
       EngineVersion: 8.0.19
-      MasterUsername: admin  ## MySQL Required for MySQL.Must be 1 to 16 letters or numbers.First character must be a letter. ### Can't manage the master user password with AWS Secrets Manager if MasterUserPassword is specified. ### If you specify the SourceDBInstanceIdentifier or DBSnapshotIdentifier property, don't specify this property. The value is inherited from the source DB instance or snapshot.
-      MasterUserPassword: arrow123456   ## The password for the master user. The password can include any printable ASCII character except "/", """, or "@".
+      MasterUsername: admin  
+      MasterUserPassword: arrow123456   
       MaxAllocatedStorage: 100
       MultiAZ: false
       Port: 3306
       PreferredBackupWindow : 02:00-02:30
       PreferredMaintenanceWindow : fri:03:00-fri:03:30
-      PubliclyAccessible: true  ### Best Practise olarak private olması gerekir. Private bir subnet içinde olsun ki sadece ben database'i güncelleyebileyim. Aynı VPC içindeki my-client bir EC2 üzerinden jump-box yapıp database'e ulaşmalıyız. Fakat bu application'da "allows users to search, add, update and delete the phonebook records". Bu yüzden public olmalı, default VPC kullanmamız isteniyor, default VPC'de private subnet yok henüz. #If you specify false, AWS CloudFormation creates an internal instance with a DNS name that resolves to a private IP address.
-      StorageType : gp2 ## Valid values: gp2 | gp3 | io1 | standard
-
+      PubliclyAccessible: true  
+      StorageType : gp2 
   WebServerTG:     
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      HealthCheckIntervalSeconds: 10    ## the default is 30 seconds  (HTTP için default değer)
-      # HealthCheckPath: /              ## The default is /   (HTTP için default değer)
-      HealthCheckTimeoutSeconds: 5      ## default is 6 seconds.    (HTTP için default değer)
-      HealthyThresholdCount: 3          ## default is 5       (HTTP için default değer)
+      HealthCheckIntervalSeconds: 10    
+      HealthCheckTimeoutSeconds: 5     
+      HealthyThresholdCount: 3          
       Port: 80
       Protocol: HTTP
-      # TargetType : instance           ## This is the default value.
-      # UnhealthyThresholdCount: 2      ## default is 2  (HTTP için default değer)
       VpcId: !Ref VPC
-
   WebServerLT:        
-    Type: AWS::EC2::LaunchTemplate   ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-launchtemplate.html
+    Type: AWS::EC2::LaunchTemplate  
     Properties:
-      LaunchTemplateData: ## required  yes  ## Kırmızı  LaunchTemplateData'a tıkla  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-launchtemplate-launchtemplatedata.html
-        ImageId: !FindInMap   ## Mappings'tan çağırmak için  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-findinmap.html
+      LaunchTemplateData: 
+        ImageId: !FindInMap  
           - RegionImageMap
-          - !Ref "AWS::Region"    ### ImageId: ami-0aa7d40eeae50c9a9 şeklinde kısa bir yazım da mümkün.
+          - !Ref "AWS::Region"    
           - AMI
-        InstanceType: !Ref InstanceType   ## liste olsun, parameters kısmında belirteceğim
-        KeyName: !Ref KeyName           ## ### Parameters'dan çağırmak için !Ref
+        InstanceType: !Ref InstanceType   
+        KeyName: !Ref KeyName           
         SecurityGroupIds: 
           - !GetAtt WebServerSecGrp.GroupId
         TagSpecifications:
@@ -162,72 +142,51 @@ Resources:
                 wget https://github.com/alparslanu6347/my-projects/blob/main/aws/projects/Project-004-Phonebook-Application/phonebook-app.py
                 python3 phonebook-app.py
               - MyDBURI: !GetAtt DBServer.Endpoint.Address
-      LaunchTemplateName: arrowcfnlt  ## required no
-
+      LaunchTemplateName: arrowcfnlt 
   AppLoadBalancer:
     Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
     Properties:
       IpAddressType: ipv4
-      Name: arrowcfnelb ## ## not required. # The name of the load balancer. This name must be unique per region per account, can have a maximum of 32 characters, must contain only alphanumeric characters or hyphens, must not begin or end with a hyphen, and must not begin with "internal-".
-      Scheme: internet-facing  ## The default is an Internet-facing load balancer.
+      Name: arrowcfnelb 
       SecurityGroups:
         - !GetAtt ALBSecGrp.GroupId
       Subnets: !Ref Subnets
-      Type: application  ## The default is application.
-
   ALBListener:
     Type: "AWS::ElasticLoadBalancingV2::Listener"
     Properties:
-      DefaultActions: #required  ## kırmızı Action'a tıkla
-        - TargetGroupArn: !Ref WebServerTG   ## Specify only when Type is forward and you want to route to a single target group.
+      DefaultActions: 
+        - TargetGroupArn: !Ref WebServerTG   
           Type: forward
-      LoadBalancerArn: !Ref AppLoadBalancer #required  ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
-      Port: 80 #required
-      Protocol: HTTP #required
-
+      LoadBalancerArn: !Ref AppLoadBalancer 
+      Port: 80 
+      Protocol: HTTP 
   WebServerASG:
-    Type: "AWS::AutoScaling::AutoScalingGroup" ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-as-group.html
+    Type: "AWS::AutoScaling::AutoScalingGroup" 
     Properties:
       AvailabilityZones:
-        !GetAZs ""  # AZ'lerin hepsini seç ""   ##  !GetAZs us-east-1 bu yazım da doğru. ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-getavailabilityzones.html
+        - !GetAZs ""  
       DesiredCapacity: 2
-      HealthCheckGracePeriod: 90 # EC2 kendine geldikten 90 saniye sonra healt-check yap.
+      HealthCheckGracePeriod: 90 
       HealthCheckType: ELB
       LaunchTemplate:
-        LaunchTemplateId: !Ref WebServerLT   ## Kırmızı LaunchTemplateSpecification'a tıkla ## You must specify the LaunchTemplateID or the LaunchTemplateName  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-autoscaling-autoscalinggroup-launchtemplatespecification.html
-        Version: !GetAtt WebServerLT.LatestVersionNumber  ## required yes. ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-as-group.html#aws-properties-as-group--examples
-      MaxSize: 3 #required
-      MinSize: 1 #required
-      TargetGroupARNs:   ### Bunu tanımladığım için LoadBalancerNames'e gerek yok.
+        LaunchTemplateId: !Ref WebServerLT   
+        Version: !GetAtt WebServerLT.LatestVersionNumber  
+      MaxSize: 3 
+      MinSize: 1 
+      TargetGroupARNs: 
         - !Ref WebServerTG
-      # VPCZoneIdentifier: !Ref Subnets
-
   WebServerASGPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
-      AutoScalingGroupName: !Ref WebServerASG # Required
+      AutoScalingGroupName: !Ref WebServerASG
       PolicyType: TargetTrackingScaling
       TargetTrackingConfiguration:
         PredefinedMetricSpecification:
           PredefinedMetricType: ASGAverageCPUUtilization
         TargetValue: 60.0
- 
-Outputs:      ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html
+Outputs:      
   WebsiteURL:
     Description: Phonebook Application Load Balancer URL
-    Value: !Sub     ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html
+    Value: !Sub     
       - http://${ALBAddress}
-      - ALBAddress: !GetAtt AppLoadBalancer.DNSName  ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
-
-
-# Outputs:        ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/outputs-section-structure.html
-#   Logical ID:
-#     Description: Information about the value
-#     Value: Value to return
-#     Export:  ## export etmeyeceğim için kullanmadım
-#       Name: Name of resource to export
-
-
-# Name: !Sub  ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html
-#   - 'www.${Domain}'
-#   - Domain: !Ref RootDomainName
+      - ALBAddress: !GetAtt AppLoadBalancer.DNSName
