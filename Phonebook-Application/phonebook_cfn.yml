@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  The application stack is created with new AWS resources.
+  Template creates Application Load Balancer with Auto Scaling Group of Amazon Linux 2 EC2 Instances within default VPC.
+  Application Load Balancer is placed within a security group which allows HTTP (80) connections from anywhere.
+  EC2 instances are placed within a different security group which allows HTTP (80) connections only from the
+  security group of Application Load Balancer.
+  WebServerSecGrp is placed in DBSecGrp Inbound, so Web Servers can communicate with Database Server (DBServer).
+  Database Server (DBServer) allows Developers to connect TCP (3306) via client.
+  The Auto Scaling Group uses a Launch Template in order to launch instances needed.
+  The Launch Template is configured to prepare Python Flask environment on EC2 instance,
+  download the Phonebook Application code from Github repository, deploy the application on Flask Server.
+  Phonebook Application Website URL will be given as output by Cloudformation Service, after the stack created.
+  Application code is downloaded from Github repository, then WebServerLT is configured to prepare Python Flask 
+  environment on EC2 and to deploy Phonebook Application on Flask Server.
+Parameters:
+  InstanceType:    
+    Description: Select your instance type.
+    Type: String
+    Default: t2.micro
+    AllowedValues:                
+      - t2.micro
+      - t2.nano
+      - t3.micro
+      - m1.small
+  VPC:                                      
+    Description: Select your VPC
+    Type: AWS::EC2::VPC::Id 
+  KeyName:                                  
+    Description: Please choose your key-pair.
+    Type: AWS::EC2::KeyPair::KeyName
+  Subnets:                                  
+    Description: Select at least 2 subnets
+    Type: List<AWS::EC2::Subnet::Id> 
+Mappings:  
+  RegionImageMap:     
+    us-east-1:
+      AMI: ami-0aa7d40eeae50c9a9
+    us-east-2:
+      AMI: ami-05bfbece1ed5beb54
+    us-west-1:
+      AMI: ami-0036b4598ccd42565
+    us-west-2:
+      AMI: ami-06e85d4c3149db26a
+    eu-west-1:
+      AMI: ami-0b752bf1df193a6c4
+Resources:
+  WebServerSecGrp:
+    Type: AWS::EC2::SecurityGroup    
+    Properties:                     
+      GroupDescription: Enable HTTP for Flask Web Server and SSH connecting to EC2
+      SecurityGroupIngress:
+         - IpProtocol: tcp
+           FromPort: 22
+           ToPort: 22
+           CidrIp: 0.0.0.0/0
+         - IpProtocol: tcp          
+           FromPort: 80             
+           ToPort: 80
+           SourceSecurityGroupId: !GetAtt ALBSecGrp.GroupId  
+      VpcId: !Ref VPC             
+  ALBSecGrp:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP for Application Load Balancer
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref VPC
+  DBSecGrp:   
+    Type: AWS::RDS::DBSecurityGroup   
+    Properties:
+      DBSecurityGroupIngress:   
+        - EC2SecurityGroupId: !GetAtt WebServerSecGrp.GroupId
+      GroupDescription: Access for Front-End to Application.
+  DBServer:     
+    Type: AWS::RDS::DBInstance 
+    Properties:
+      AllocatedStorage: 20  
+      AllowMajorVersionUpgrade: false
+      AutoMinorVersionUpgrade: true
+      BackupRetentionPeriod: 7
+      DBInstanceClass: db.t2.micro   
+      DBInstanceIdentifier: arrow
+      DBName: clarusway_phonebook  
+      DBSecurityGroups:
+        - !Ref DBSecGrp
+      Engine: mysql
+      EngineVersion: 8.0.19
+      MasterUsername: admin  
+      MasterUserPassword: arrow123456   
+      MaxAllocatedStorage: 100
+      MultiAZ: false
+      Port: 3306
+      PreferredBackupWindow : 02:00-02:30
+      PreferredMaintenanceWindow : fri:03:00-fri:03:30
+      PubliclyAccessible: true  
+      StorageType : gp2 
+  WebServerTG:     
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10    
+      HealthCheckTimeoutSeconds: 5     
+      HealthyThresholdCount: 3          
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VPC
+  WebServerLT:        
+    Type: AWS::EC2::LaunchTemplate  
+    Properties:
+      LaunchTemplateData: 
+        ImageId: !FindInMap  
+          - RegionImageMap
+          - !Ref "AWS::Region"    
+          - AMI
+        InstanceType: !Ref InstanceType   
+        KeyName: !Ref KeyName           
+        SecurityGroupIds: 
+          - !GetAtt WebServerSecGrp.GroupId
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub Web Server of ${AWS::StackName} Stack
+        UserData:
+          Fn::Base64:
+            !Sub 
+              - |
+                #! /bin/bash
+                yum update -y
+                yum install python3 -y
+                pip3 install flask
+                pip3 install flask_mysql
+                yum install git -y
+                cd /home/ec2-user
+                echo "${MyDBURI}" > dbserver.endpoint 
+                wget -P templates https://raw.githubusercontent.com/alparslanu6347/my-projects/main/aws/projects/Project-004-Phonebook-Application/templates/index.html
+                wget -P templates https://raw.githubusercontent.com/alparslanu6347/my-projects/main/aws/projects/Project-004-Phonebook-Application/templates/add-update.html
+                wget -P templates https://raw.githubusercontent.com/alparslanu6347/my-projects/main/aws/projects/Project-004-Phonebook-Application/templates/delete.html
+                wget https://github.com/alparslanu6347/my-projects/blob/main/aws/projects/Project-004-Phonebook-Application/phonebook-app.py
+                python3 phonebook-app.py
+              - MyDBURI: !GetAtt DBServer.Endpoint.Address
+      LaunchTemplateName: arrowcfnlt 
+  AppLoadBalancer:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      IpAddressType: ipv4
+      Name: arrowcfnelb 
+      SecurityGroups:
+        - !GetAtt ALBSecGrp.GroupId
+      Subnets: !Ref Subnets
+  ALBListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions: 
+        - TargetGroupArn: !Ref WebServerTG   
+          Type: forward
+      LoadBalancerArn: !Ref AppLoadBalancer 
+      Port: 80 
+      Protocol: HTTP 
+  WebServerASG:
+    Type: "AWS::AutoScaling::AutoScalingGroup" 
+    Properties:
+      AvailabilityZones:
+        - !GetAZs ""  
+      DesiredCapacity: 2
+      HealthCheckGracePeriod: 90 
+      HealthCheckType: ELB
+      LaunchTemplate:
+        LaunchTemplateId: !Ref WebServerLT   
+        Version: !GetAtt WebServerLT.LatestVersionNumber  
+      MaxSize: 3 
+      MinSize: 1 
+      TargetGroupARNs: 
+        - !Ref WebServerTG
+  WebServerASGPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref WebServerASG
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 60.0
+Outputs:      
+  WebsiteURL:
+    Description: Phonebook Application Load Balancer URL
+    Value: !Sub     
+      - http://${ALBAddress}
+      - ALBAddress: !GetAtt AppLoadBalancer.DNSName
