@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  Cloudformation Template for kittens carousel static website deploy on s3 through cloudfront and route 53
+Parameters: 
+  DomainName:   ### parameter-type-route53-hostedzone-id  yazınca çıkıyor, üstteki. Eğer birden fazla hosted zone varsa => parameter-type-route53-hostedzone-id-list yaz
+    Description: DNS Name of existing Amazon Route 53 hosted zone ==>> devopsalparslanugurer.com ### hosted zone
+    Type: AWS::Route53::HostedZone::Id
+
+  KittensFullDomainName:
+    Description: Full domain name for the App. ex. ==>> kittens.devopsalparslanugurer.com   /   www.devopsalparslanugurer.com  ### hosted zone
+    Type: String
+    AllowedPattern: (?!-)[a-zA-Z0-9-.]{1,63}(?<!-)   ### REGEX ### https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DomainNameFormat.html?icmpid=docs_console_unmapped#domain-name-format-registration
+    ### The domain name should be a-z or A-Z or 0-9 and hyphen (-)
+    ### The domain name should be between 1 and 63 characters long
+
+# Parameters: #### ChatGPT'inin verdiği parametreler
+#   HostedZoneName:
+#     Description: "The DNS name of an existing Amazon Route 53 hosted zone
+#       (e.g. clarusway.us)"
+#     Type: String
+#   DomainName:
+#     Description: "The full domain name for the web application
+#       (e.g. kittens.clarusway.us)"
+#     Type: String
+
+Resources:
+  KittensBucket:    ### s3-bucket yazınca üsttekini seç
+    Type: AWS::S3::Bucket ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+    Properties: 
+      AccessControl: PublicRead   ### https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html#canned-acl
+      BucketName: !Ref KittensFullDomainName  ### bu kısım full domain ismi=bucket name olacağı için 9.satırı referans alacak.  ## such as www.example.com
+      WebsiteConfiguration: 
+        IndexDocument: index.html   ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-websiteconfiguration.html
+
+  KittensBucketPolicy:    ### s3-bucketpolicy yazınca üstteki
+    Type: AWS::S3::BucketPolicy   ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-policy.html
+    Properties:
+      Bucket: !Ref KittensBucket  ### Bucket name  15.satır
+      PolicyDocument:       ### Policy ister jsson ister yaml fark etmiyor, ikisini dekabul ediyor. Cloudformation yaml'ı jason'a dönüştürüyot.
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadforStaticWebsite  ### AWS S3 Console'da Bucket policy içerisinde ==>> "Sid": "PublicReadGetObject"
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Join # Resource: !Join ['', ['arn:aws:s3:::', !Ref 'KittensBucket', /*]]  ### TEK SATIR OLARAK YAZILABİLİR
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref KittensBucket
+                - /*
+  #### sertifika zaten wild car yani *. olarak aldık, almamıza gerek yok ama proje kapsamında template ile almayı görmek için.
+  KittensCertificate:   ### certificatemanager yazınca alttaki ==> certificatemanager-certificate
+    Type: AWS::CertificateManager::Certificate ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-certificatemanager-certificate.html
+    Properties:
+      CertificateTransparencyLoggingPreference: ENABLED ### güvenlik gerekçesiyle.şeffaflık log kayıtlarını tutuyor
+      DomainName: !Ref KittensFullDomainName  ### bu kısım full domain ismi=bucket name olacağı için 9.satırı referans alacak.  ## such as www.example.com
+      DomainValidationOptions:    ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-certificatemanager-certificate-domainvalidationoption.html
+        - DomainName: !Ref KittensFullDomainName ### bu kısım full domain ismi=bucket name olacağı için 9.satırı referans alacak.  ## such as www.example.com
+          HostedZoneId: !Ref DomainName   ### parameter 5. satır  DNS Name of existing Amazon Route 53 hosted zone devopsalparslanugurer.com ### hosted zone
+      ValidationMethod: DNS   #### ya e mail ya da dns le olacağının bilgisini verir.
+                ### üst satır için; burada belirtilen dns name için certifika çıkar ve certifikayı 43.satırda enable et koru.
+                
+  KittensCloudfront:    ### cloudfrontDistribution  yaz ve çıkanlardan alttakini seç
+    Type: AWS::CloudFront::Distribution  ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudfront-distribution.html
+    Properties:
+      DistributionConfig:   ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-distributionconfig.html
+        Aliases:    ### CNAMEs (alternate domain names)  ### Liste şeklinde istiyor.
+        - !Ref KittensFullDomainName  ### bu kısım full domain ismi=bucket name olacağı için 9.satırı referans alacak.
+        Comment: Cloudfront Distribution pointing to Kittens S3 bucket
+        DefaultCacheBehavior:  ### projede get ve head e izin vermemizi söylüyor. ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-cachebehavior.html
+          AllowedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: none  ### cookies (çerezleri) iptal ettik.  ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-cookies.html
+          TargetOriginId: KittensOrigin   ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-cachebehavior.html
+          ViewerProtocolPolicy: allow-all  Viewers can use HTTP or HTTPS. ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-cachebehavior.html#cfn-cloudfront-distribution-cachebehavior-viewerprotocolpolicy
+        DefaultRootObject: index.html
+        Enabled: true ### status check 
+        HttpVersion: 'http2'
+        Origins:  ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-origin.html
+        - DomainName: !Select [2, !Split ["/", !GetAtt KittensBucket.WebsiteURL]]  ### http den ayır ikinci kısmı döndür. https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-select.html
+          Id: KittensOrigin
+          CustomOriginConfig:
+            OriginProtocolPolicy: http-only  ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-customoriginconfig.html#cfn-cloudfront-distribution-customoriginconfig-originprotocolpolicy
+        PriceClass: PriceClass_All  ### en iyi hizmet, All dediğimizde bütün edge locations ları kullanır.
+        ViewerCertificate:     ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-viewercertificate.html
+          AcmCertificateArn: !Ref KittensCertificate  ### 41. satır referans alır.
+          SslSupportMethod: sni-only  ### The distribution accepts HTTPS connections from only viewers that support
+
+  KittensRecordSet:         #### route53-recordsetgroup  yazınca üstteki veya alttaki farketmez seç.
+    Type: AWS::Route53::RecordSetGroup    ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-route53-recordsetgroup.html
+    Properties:
+      HostedZoneId: !Ref DomainName   ### parameter 5. satır  DNS Name of existing Amazon Route 53 hosted zone devopsalparslanugurer.com ### hosted zone
+      RecordSets:     ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-recordset-1.html
+        - Name: !Ref KittensFullDomainName
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt KittensCloudfront.DomainName   ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudfront-distribution.html
+            HostedZoneId: Z2FDTNDATAQYW2  ### Specify Z2FDTNDATAQYW2. This is always the hosted zone ID when you create an alias record that routes traffic to a CloudFront distribution.  ###https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-route53-aliastarget-1.html
+ 
+Outputs:
+  BucketName:   ### Return Values ==>>  https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
+    Description: S3 Bucket URL for Kittens Website
+    Value: !GetAtt KittensBucket.WebsiteURL
+  CloudfrontEndpoint:   ### Return values ==>> https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudfront-distribution.html
+    Description: Endpoint for Kittens Cloudfront
+    Value: !GetAtt KittensCloudfront.DomainName
+  FullDomainName:   ### Return values ==>> 
+    Description: Full Domain Name of my Application
+    Value: !Ref KittensFullDomainName  ### ### Return values ==>> Parametreden referans !Ref
+
