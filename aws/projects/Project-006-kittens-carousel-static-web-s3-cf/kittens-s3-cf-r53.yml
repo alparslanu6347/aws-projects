@@ -7,10 +7,9 @@ Parameters:
     Description: DNS Name of existing Amazon Route 53 hosted zone ex. devopsalparslanugurer.com
     Type: AWS::Route53::HostedZone::Id
   KittensDomainName:
-    Description: Full domain name for the App. ex. kittevs.devopsalparslanugurer.com
+    Description: Full domain name for the App. ex. kittens.devopsalparslanugurer.com
     Type: String
     AllowedPattern: (?!-)[a-zA-Z0-9-.]{1,63}(?<!-)  
-
 
 Resources:
   KittensBucket:
