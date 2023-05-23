@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Deploys the Kittens Carousel web application as a static website on 
+  AWS S3 using AWS Cloudfront and Route 53"
+
+Parameters:
+  HostedZoneName:
+    Description: "The DNS name of an existing Amazon Route 53 hosted zone 
+      (e.g. clarusway.us)"
+    Type: String
+  DomainName:
+    Description: "The full domain name for the web application 
+      (e.g. kittens.clarusway.us)"
+    Type: String
+
+Resources:
+  KittensBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub "kittens-${AWS::AccountId}-${AWS::Region}"
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+  KittensBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref KittensBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Join ['', ['arn:aws:s3:::', !Ref KittensBucket, '/*']]
+  KittensDistribution:
+    Type: "AWS::CloudFront::Distribution"
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !GetAtt KittensBucket.DomainName
+            Id: KittensBucketOrigin
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        Enabled: true
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          TargetOriginId: KittensBucketOrigin
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          MinTTL: 0
+          MaxTTL: 31536000
+          DefaultTTL: 86400
+        ViewerCertificate:
+          AcmCertificateArn: YOUR_ACM_CERTIFICATE_ARN
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2018
+        Aliases:
+          - !Ref DomainName
+  KittensRecordSet:
+    Type: "AWS::Route53::RecordSet"
+    Properties:
+      HostedZoneName: !Ref HostedZoneName
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt KittensDistribution.DomainName
+        EvaluateTargetHealth: false
+
+Outputs:
+  KittensDomainName:
+    Value: !Ref DomainName
+  KittensDistributionEndpoint:
+    Value: !GetAtt KittensDistribution.DomainName
+  KittensBucketName:
+    Value: !Ref KittensBucket

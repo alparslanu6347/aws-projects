@@ -30,7 +30,7 @@ Resources:
   
   KittensBucket:    ### s3-bucket yazınca üsttekini seç
     Type: AWS::S3::Bucket ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-s3-bucket.html
-    Properties: 
+    Properties:     ###### Bucket üzerindeki block kaldırıldı, KIRMIZI "Publicly accessible" yazısı görüldü.
       AccessControl: PublicRead   ###  Public olması önündeki block'u kaldırır,KIRMIZI "Publicly accessible" yazısını gör! ### https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html#canned-acl
       BucketName: !Ref KittensFullDomainName  ### bu kısım full domain ismi=bucket name olacağı için 9.satırı referans alacak.  ## such as www.example.com
       WebsiteConfiguration: 
@@ -42,7 +42,7 @@ Resources:
       Bucket: !Ref KittensBucket  ### Bucket name  15.satır
       PolicyDocument:       ### Policy ister jsson ister yaml fark etmiyor, ikisini dekabul ediyor. Cloudformation yaml'ı jason'a dönüştürüyot.
         Version: 2012-10-17
-        Statement:          ### Burada viewer(müşteri) siteyi görebilsin diye izin verdik
+        Statement:          ### Burada viewer(müşteri) siteyi görebilsin diye policy ile izin verdik
           - Sid: PublicReadforStaticWebsite  ### AWS S3 Console'da Bucket policy içerisinde ==>> "Sid": "PublicReadGetObject"
             Effect: Allow
             Principal: '*'
@@ -70,7 +70,7 @@ Resources:
     Type: AWS::CloudFront::Distribution  ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cloudfront-distribution.html
     Properties:
       DistributionConfig:   ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-distributionconfig.html
-        Aliases:    ### Console'da "alternate domain names"
+        Aliases:    ### Console'da "alternate domain names" A complex type that contains information about CNAMEs (alternate domain names)
         - !Ref KittensFullDomainName  ### bu kısım full domain ismi=bucket name olacağı için 9.satırı referans alacak.
         Comment: Cloudfront Distribution pointing to Kittens S3 bucket
         DefaultCacheBehavior:  ### projede get ve head e izin vermemizi söylüyor. ### https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-cloudfront-distribution-cachebehavior.html
@@ -120,9 +120,8 @@ Outputs:
     Value: !Ref KittensFullDomainName  ### ### Return values ==>> Parametreden referans !Ref
 
 
-### KittensBucketPolicy  oluştururken verdiğimiz izin viewer(müşteri)'in siteyi görebilmesi için
 ### KittensBucket   oluştururken de Bucket üzerindeki block kaldırıldı, KIRMIZI "Publicly accessible" yazısı görüldü.
-
+### KittensBucketPolicy  oluşturarak viewer(müşteri)'in siteyi görebilmesi için izin verdik
 
 ### Static Website gerekli olan dökümanlar bu template içinde tanımlanamıyor.
 #### OBJECTS =====>>>>> kittens.devopsalparslanugurer.com
