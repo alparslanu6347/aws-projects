@@ -10,7 +10,7 @@ List of projects within AWS workshop as follows;
 
 4. - [Project-006 : Kittens Carousel Static Website deployed on AWS Cloudfront, S3 and Route 53 using Cloudformation](./Project-006-kittens-carousel-static-web-s3-cf/README.md)
 
-5. - [Project-503 : Capstone Project Blog Page App (Django) on AWS Environment](./Project-503-Capstone-Project-Blog-Page-App-(Django)-on-AWS-Environment/README.md) 
+5. - [Project-503 : Capstone Project Blog Page App (Django) on AWS Environment](./arrow_aws-capstone-project/README.md) 
 
 
 
